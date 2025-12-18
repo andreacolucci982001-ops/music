@@ -699,45 +699,11 @@
             margin-top: 20px;
         }
 
-        /* Codice SQL */
-        .sql-section {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 40px;
-            border-left: 4px solid #4cc9f0;
-        }
-
-        .sql-section h3 {
-            color: #4cc9f0;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .sql-code {
-            background: #1a1a2e;
-            border-radius: 8px;
-            padding: 20px;
-            overflow-x: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            color: #f0f0f0;
-        }
-
-        .sql-comment {
-            color: #6c757d;
-        }
-
-        .sql-keyword {
-            color: #4cc9f0;
-            font-weight: bold;
-        }
-
-        .sql-string {
-            color: #9acd32;
+        /* Debug section */
+        .debug-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         /* Responsive */
@@ -831,6 +797,12 @@
                             <span class="stat-label">Spazio utilizzato</span>
                         </div>
                     </div>
+                </div>
+
+                <div class="debug-section">
+                    <button id="debug-btn" class="upload-btn" style="background: #ff6b6b;">
+                        <i class="fas fa-bug"></i> Debug Database
+                    </button>
                 </div>
             </div>
 
@@ -1116,6 +1088,9 @@
             audio.addEventListener('timeupdate', updateProgress);
             audio.addEventListener('ended', playNext);
             
+            // Debug button
+            document.getElementById('debug-btn').addEventListener('click', debugDatabase);
+            
             setupUploadListeners();
         }
 
@@ -1160,56 +1135,135 @@
             }
         }
 
-        // Carica tracce da Supabase
+        // Carica tracce da Supabase (VERSIONE CORRETTA)
         async function loadAudioTracks() {
             showLoading();
             
             try {
+                console.log('Caricamento tracce con ordinamento:', currentSort);
+                
                 let query = supabaseClient.from('tracce_audio').select('*');
                 
+                // Filtra per genere
                 if (currentGenre !== 'tutti') {
                     query = query.eq('genere', currentGenre);
                 }
                 
+                // Filtra per ricerca
                 if (currentSearch) {
                     query = query.or(`titolo.ilike.%${currentSearch}%,artista.ilike.%${currentSearch}%`);
                 }
                 
+                // Applica ordinamento - CORREZIONE: usa data_caricamento invece di data
                 const [field, order] = currentSort.split('_');
-                query = query.order(field, { ascending: order === 'asc' });
+                let sortField;
+                let sortOptions = { ascending: order === 'asc' };
+                
+                // Mappa i nomi dei campi con le colonne reali nel database
+                switch(field) {
+                    case 'titolo':
+                        sortField = 'titolo';
+                        break;
+                    case 'durata':
+                        sortField = 'durata';
+                        break;
+                    case 'data':
+                        sortField = 'data_caricamento'; // CORREZIONE: nome corretto della colonna
+                        break;
+                    default:
+                        sortField = 'data_caricamento';
+                        sortOptions.ascending = false; // Default: più recenti prima
+                }
+                
+                console.log('Ordinamento per:', sortField, sortOptions);
+                query = query.order(sortField, sortOptions);
                 
                 const { data, error } = await query;
                 
-                if (error) throw error;
-                
-                audioTracks = data || [];
-                
-                if (audioTracks.length === 0) {
-                    // Se non ci sono tracce in Supabase, carica quelle demo
-                    await checkAndCreateTable();
-                    loadSampleTracks();
-                } else {
-                    renderAudioTracks();
-                    updateStats();
+                if (error) {
+                    console.error('Errore query Supabase:', error);
+                    throw error;
                 }
                 
+                audioTracks = data || [];
+                console.log(`Caricate ${audioTracks.length} tracce`);
+                
+                if (audioTracks.length === 0) {
+                    audioList.innerHTML = `
+                        <div class="loading">
+                            <i class="fas fa-music"></i>
+                            <p>Nessuna traccia audio trovata</p>
+                            <p style="font-size:0.9rem; margin-top:10px;">Prova a cambiare i filtri o carica una nuova traccia</p>
+                        </div>
+                    `;
+                } else {
+                    renderAudioTracks();
+                }
+                
+                updateStats();
+                
             } catch (error) {
-                console.error('Errore Supabase, carico demo:', error);
-                loadSampleTracks();
+                console.error('Errore caricamento da Supabase:', error);
+                showMessage('Errore nel caricamento delle tracce', 'error');
+                
+                // Modalità demo di fallback
+                if (audioTracks.length === 0) {
+                    loadSampleTracks();
+                } else {
+                    // Usa ordinamento locale sui dati già caricati
+                    filterAndSortTracks();
+                }
             }
         }
 
-        // Verifica e crea tabella se non esiste
-        async function checkAndCreateTable() {
-            try {
-                // Prova a creare la tabella se non esiste
-                const { error } = await supabaseClient.rpc('create_tracks_table_if_not_exists');
-                if (error) {
-                    console.log('Tabella non creata, usando demo:', error.message);
-                }
-            } catch (error) {
-                console.log('Funzione RPC non disponibile');
+        // Funzione di fallback per ordinamento locale
+        function filterAndSortTracks() {
+            let filteredTracks = [...audioTracks];
+            
+            if (currentGenre !== 'tutti') {
+                filteredTracks = filteredTracks.filter(track => track.genere === currentGenre);
             }
+            
+            if (currentSearch) {
+                const searchLower = currentSearch.toLowerCase();
+                filteredTracks = filteredTracks.filter(track => 
+                    track.titolo.toLowerCase().includes(searchLower) || 
+                    track.artista.toLowerCase().includes(searchLower)
+                );
+            }
+            
+            const [field, order] = currentSort.split('_');
+            const isAscending = order === 'asc';
+            
+            filteredTracks.sort((a, b) => {
+                let aValue, bValue;
+                
+                switch(field) {
+                    case 'titolo':
+                        aValue = a.titolo.toLowerCase();
+                        bValue = b.titolo.toLowerCase();
+                        break;
+                    case 'durata':
+                        aValue = a.durata;
+                        bValue = b.durata;
+                        break;
+                    case 'data':
+                        aValue = new Date(a.data_caricamento);  // CORRETTO: data_caricamento
+                        bValue = new Date(b.data_caricamento);
+                        break;
+                    default:
+                        aValue = new Date(a.data_caricamento);
+                        bValue = new Date(b.data_caricamento);
+                }
+                
+                if (aValue < bValue) return isAscending ? -1 : 1;
+                if (aValue > bValue) return isAscending ? 1 : -1;
+                return 0;
+            });
+            
+            audioTracks = filteredTracks;
+            renderAudioTracks();
+            updateStats();
         }
 
         // Carica tracce demo
@@ -1251,70 +1305,20 @@
             filterAndSortTracks();
         }
 
-        // Filtra e ordina tracce
-        function filterAndSortTracks() {
-            let filteredTracks = [...audioTracks];
-            
-            if (currentGenre !== 'tutti') {
-                filteredTracks = filteredTracks.filter(track => track.genere === currentGenre);
-            }
-            
-            if (currentSearch) {
-                const searchLower = currentSearch.toLowerCase();
-                filteredTracks = filteredTracks.filter(track => 
-                    track.titolo.toLowerCase().includes(searchLower) || 
-                    track.artista.toLowerCase().includes(searchLower)
-                );
-            }
-            
-            const [field, order] = currentSort.split('_');
-            const isAscending = order === 'asc';
-            
-            filteredTracks.sort((a, b) => {
-                let aValue, bValue;
-                
-                switch(field) {
-                    case 'titolo':
-                        aValue = a.titolo.toLowerCase();
-                        bValue = b.titolo.toLowerCase();
-                        break;
-                    case 'durata':
-                        aValue = a.durata;
-                        bValue = b.durata;
-                        break;
-                    case 'data':
-                        aValue = new Date(a.data_caricamento);
-                        bValue = new Date(b.data_caricamento);
-                        break;
-                    default:
-                        aValue = new Date(a.data_caricamento);
-                        bValue = new Date(b.data_caricamento);
-                }
-                
-                if (aValue < bValue) return isAscending ? -1 : 1;
-                if (aValue > bValue) return isAscending ? 1 : -1;
-                return 0;
-            });
-            
-            audioTracks = filteredTracks;
-            renderAudioTracks();
-            updateStats();
-        }
-
         // Gestisce cambio genere
         function handleGenreChange() {
-            filterAndSortTracks();
+            loadAudioTracks();
         }
 
         // Gestisce cambio ordinamento
         function handleSortChange() {
-            filterAndSortTracks();
+            loadAudioTracks();
         }
 
         // Esegui ricerca
         function performSearch() {
             currentSearch = searchInput.value.trim();
-            filterAndSortTracks();
+            loadAudioTracks();
         }
 
         // Mostra loading
@@ -1323,19 +1327,6 @@
                 <div class="loading">
                     <i class="fas fa-spinner fa-spin"></i>
                     <p>Caricamento tracce audio...</p>
-                </div>
-            `;
-        }
-
-        // Mostra errore
-        function showError(message) {
-            audioList.innerHTML = `
-                <div class="loading">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>${message}</p>
-                    <button onclick="window.location.reload()" style="margin-top:15px; padding:10px 20px; background:#4361ee; color:white; border:none; border-radius:5px; cursor:pointer;">
-                        Ricarica
-                    </button>
                 </div>
             `;
         }
@@ -1555,6 +1546,61 @@
                 }
             `;
             document.head.appendChild(style);
+        }
+
+        // Debug database
+        async function debugDatabase() {
+            console.log('=== DEBUG DATABASE ===');
+            console.log('Supabase URL:', SUPABASE_URL);
+            console.log('Tabella: tracce_audio');
+            console.log('Filtri attivi:');
+            console.log('- Genere:', currentGenre);
+            console.log('- Ricerca:', currentSearch);
+            console.log('- Ordinamento:', currentSort);
+            
+            try {
+                // Test 1: Verifica connessione
+                console.log('\n1. Test connessione...');
+                const { data: testData, error: testError } = await supabaseClient
+                    .from('tracce_audio')
+                    .select('count')
+                    .limit(1);
+                
+                console.log('Conteggio:', testData, 'Errore:', testError);
+                
+                // Test 2: Query semplice
+                console.log('\n2. Query semplice...');
+                const { data: simpleData, error: simpleError } = await supabaseClient
+                    .from('tracce_audio')
+                    .select('*')
+                    .limit(3);
+                
+                console.log('Prime 3 tracce:', simpleData, 'Errore:', simpleError);
+                
+                // Test 3: Verifica colonne
+                console.log('\n3. Verifica colonne...');
+                const { data: allData, error: allError } = await supabaseClient
+                    .from('tracce_audio')
+                    .select('*');
+                
+                if (allData && allData.length > 0) {
+                    console.log('Colonne disponibili:', Object.keys(allData[0]));
+                    console.log('Prima traccia esempio:', allData[0]);
+                }
+                
+                alert(`Debug completato! Trovate ${allData?.length || 0} tracce.\nControlla la console per i dettagli.`);
+                
+                if (allData && allData.length > 0) {
+                    // Aggiorna con i dati reali
+                    audioTracks = allData;
+                    renderAudioTracks();
+                    updateStats();
+                }
+                
+            } catch (error) {
+                console.error('Debug error:', error);
+                alert('Errore nel debug: ' + error.message);
+            }
         }
 
         // Apre modal upload
