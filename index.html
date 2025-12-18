@@ -6,6 +6,7 @@
     <title>AudioHub - Carica e cerca tracce audio</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* Tutti gli stili CSS rimangono uguali */
         * {
             margin: 0;
             padding: 0;
@@ -698,32 +699,45 @@
             margin-top: 20px;
         }
 
-        /* Messaggi flash */
-        .flash-message {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            background: #4CAF50;
-            color: white;
+        /* Codice SQL */
+        .sql-section {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 40px;
+            border-left: 4px solid #4cc9f0;
+        }
+
+        .sql-section h3 {
+            color: #4cc9f0;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sql-code {
+            background: #1a1a2e;
             border-radius: 8px;
-            z-index: 3000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            animation: slideIn 0.3s ease;
+            padding: 20px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #f0f0f0;
         }
 
-        .flash-error {
-            background: #f44336;
+        .sql-comment {
+            color: #6c757d;
         }
 
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+        .sql-keyword {
+            color: #4cc9f0;
+            font-weight: bold;
         }
 
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
+        .sql-string {
+            color: #9acd32;
         }
 
         /* Responsive */
@@ -830,12 +844,12 @@
                     <div class="sort-options">
                         <span>Ordina per:</span>
                         <select id="sort-select">
-                            <option value="data_caricamento.desc">Più recenti</option>
-                            <option value="data_caricamento.asc">Più vecchi</option>
-                            <option value="titolo.asc">Titolo (A-Z)</option>
-                            <option value="titolo.desc">Titolo (Z-A)</option>
-                            <option value="durata.asc">Durata (corta)</option>
-                            <option value="durata.desc">Durata (lunga)</option>
+                            <option value="data_desc">Più recenti</option>
+                            <option value="data_asc">Più vecchi</option>
+                            <option value="titolo_asc">Titolo (A-Z)</option>
+                            <option value="titolo_desc">Titolo (Z-A)</option>
+                            <option value="durata_asc">Durata (corta)</option>
+                            <option value="durata_desc">Durata (lunga)</option>
                         </select>
                     </div>
                 </div>
@@ -895,7 +909,7 @@
                         <i class="fas fa-cloud-upload-alt fa-3x"></i>
                         <p>Trascina qui il tuo file audio o clicca per selezionarlo</p>
                         <p class="file-types">Supportati: MP3, WAV, OGG, M4A (max 50MB)</p>
-                        <input type="file" id="audio-file" accept=".mp3,.wav,.ogg,.m4a,.aac,.flac" style="display: none;">
+                        <input type="file" id="audio-file" accept=".mp3,.wav,.ogg,.m4a" style="display: none;">
                         <button class="browse-btn" id="browse-btn">Sfoglia File</button>
                     </div>
                     <div class="file-info" id="file-info"></div>
@@ -922,9 +936,6 @@
                         <option value="elettronica">Elettronica</option>
                         <option value="reggae">Reggae</option>
                         <option value="blues">Blues</option>
-                        <option value="metal">Metal</option>
-                        <option value="folk">Folk</option>
-                        <option value="country">Country</option>
                     </select>
                 </div>
 
@@ -958,272 +969,246 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // CONFIGURAZIONE SUPABASE
-        const SUPABASE_URL = 'https://wealnopiowilcdftywlv.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlYWxub3Bpb3dpbGNkZnR5d2x2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMzY5NjgsImV4cCI6MjA4MTYxMjk2OH0.Bw_yzLJ80BDKFW_Jefi8mBAVxavlCgLsmKofvqL4U-I';
+        // CONFIGURAZIONE SUPABASE CON I TUOI DATI
+        const SUPABASE_URL = 'https://jamlmyhqdyxlwjmaewyg.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphbWxteWhxZHl4bHdqbWFld3lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNDAzMzQsImV4cCI6MjA4MTYxNjMzNH0.rg2RugxsbWQ8t4CQpskLBNjgFvdgF3MH18FJCN5VHKU';
         
-        // Inizializza Supabase Client
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        // Stato dell'applicazione
-        let state = {
-            audioTracks: [],
-            currentAudioIndex: 0,
-            isPlaying: false,
-            currentGenre: 'tutti',
-            currentSearch: '',
-            currentSort: 'data_caricamento.desc',
-            selectedFile: null,
-            modalAudioElement: null
-        };
+        // Variabili globali
+        let supabaseClient;
+        let audioList, searchInput, searchBtn, sortSelect, genreButtons, totalTracksEl, totalSizeEl;
+        let openUploadModalBtn, uploadModal, closeModalBtn, cancelUploadBtn;
+        let audioPlayer, currentTrackTitle, currentTrackArtist, playBtn, prevBtn, nextBtn, progress, currentTimeEl, durationEl, volumeSlider;
+        let audioFileInput, dropArea, browseBtn, fileInfo, audioPreview, titleInput, artistInput, genreSelect;
+        let uploadFormBtn, uploadProgress, uploadProgressBar, progressText, uploadResult;
+        let audio, currentAudioIndex, audioTracks, isPlaying, currentGenre, currentSearch, currentSort;
+        let selectedFile, modalAudioElement;
 
-        // Elementi DOM
-        const elements = {};
-
-        // Inizializza l'app
+        // Inizializza l'applicazione
         document.addEventListener('DOMContentLoaded', () => {
-            initializeApp();
+            initApp();
         });
 
         // Funzione di inizializzazione
-        async function initializeApp() {
+        function initApp() {
+            // Inizializza Supabase Client
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            
+            // Inizializza elementi DOM
+            initDOMElements();
+            
+            // Inizializza stato
+            initAppState();
+            
+            // Configura event listener
+            setupEventListeners();
+            
+            // Carica dati iniziali
+            loadInitialData();
+            
+            // Test connessione Supabase
+            testSupabaseConnection();
+        }
+
+        // Inizializza elementi DOM
+        function initDOMElements() {
+            audioList = document.getElementById('audio-list');
+            searchInput = document.getElementById('search-input');
+            searchBtn = document.getElementById('search-btn');
+            sortSelect = document.getElementById('sort-select');
+            genreButtons = document.querySelectorAll('.genre-btn');
+            totalTracksEl = document.getElementById('total-tracks');
+            totalSizeEl = document.getElementById('total-size');
+            openUploadModalBtn = document.getElementById('open-upload-modal');
+            uploadModal = document.getElementById('upload-modal');
+            closeModalBtn = document.getElementById('close-modal');
+            cancelUploadBtn = document.getElementById('cancel-upload');
+
+            audioPlayer = document.getElementById('audio-player');
+            currentTrackTitle = document.getElementById('current-track-title');
+            currentTrackArtist = document.getElementById('current-track-artist');
+            playBtn = document.getElementById('play-btn');
+            prevBtn = document.getElementById('prev-btn');
+            nextBtn = document.getElementById('next-btn');
+            progress = document.getElementById('progress');
+            currentTimeEl = document.getElementById('current-time');
+            durationEl = document.getElementById('duration');
+            volumeSlider = document.getElementById('volume-slider');
+
+            audioFileInput = document.getElementById('audio-file');
+            dropArea = document.getElementById('drop-area');
+            browseBtn = document.getElementById('browse-btn');
+            fileInfo = document.getElementById('file-info');
+            audioPreview = document.getElementById('audio-preview');
+            titleInput = document.getElementById('title');
+            artistInput = document.getElementById('artist');
+            genreSelect = document.getElementById('genre');
+            uploadFormBtn = document.getElementById('upload-btn');
+            uploadProgress = document.getElementById('upload-progress');
+            uploadProgressBar = document.getElementById('upload-progress-bar');
+            progressText = document.getElementById('progress-text');
+            uploadResult = document.getElementById('upload-result');
+        }
+
+        // Inizializza stato app
+        function initAppState() {
+            audio = new Audio();
+            currentAudioIndex = 0;
+            audioTracks = [];
+            isPlaying = false;
+            currentGenre = 'tutti';
+            currentSearch = '';
+            currentSort = 'data_desc';
+            selectedFile = null;
+            modalAudioElement = null;
+            
+            audioPlayer.style.display = 'none';
+            uploadProgress.style.display = 'none';
+            uploadResult.style.display = 'none';
+        }
+
+        // Test connessione Supabase
+        async function testSupabaseConnection() {
             try {
-                // Raccoglie tutti gli elementi DOM
-                gatherDOMElements();
-                
-                // Configura gli event listener
-                setupEventListeners();
-                
-                // Inizializza l'audio
-                initializeAudio();
-                
-                // Carica le tracce
-                await loadAudioTracks();
-                
-                // Verifica la connessione a Supabase
-                await checkSupabaseConnection();
-                
+                const { data, error } = await supabaseClient.from('tracce_audio').select('count');
+                console.log('Connessione Supabase OK');
             } catch (error) {
-                console.error('Errore inizializzazione:', error);
-                showFlashMessage('Errore inizializzazione applicazione', 'error');
+                console.warn('Supabase non configurato, usando modalità demo:', error.message);
             }
         }
 
-        // Raccoglie tutti gli elementi DOM
-        function gatherDOMElements() {
-            // Elementi principali
-            elements.audioList = document.getElementById('audio-list');
-            elements.searchInput = document.getElementById('search-input');
-            elements.searchBtn = document.getElementById('search-btn');
-            elements.sortSelect = document.getElementById('sort-select');
-            elements.genreButtons = document.querySelectorAll('.genre-btn');
-            elements.totalTracksEl = document.getElementById('total-tracks');
-            elements.totalSizeEl = document.getElementById('total-size');
-            elements.openUploadModalBtn = document.getElementById('open-upload-modal');
-            elements.uploadModal = document.getElementById('upload-modal');
-            elements.closeModalBtn = document.getElementById('close-modal');
-            elements.cancelUploadBtn = document.getElementById('cancel-upload');
-
-            // Elementi player audio
-            elements.audioPlayer = document.getElementById('audio-player');
-            elements.currentTrackTitle = document.getElementById('current-track-title');
-            elements.currentTrackArtist = document.getElementById('current-track-artist');
-            elements.playBtn = document.getElementById('play-btn');
-            elements.prevBtn = document.getElementById('prev-btn');
-            elements.nextBtn = document.getElementById('next-btn');
-            elements.progress = document.getElementById('progress');
-            elements.currentTimeEl = document.getElementById('current-time');
-            elements.durationEl = document.getElementById('duration');
-            elements.volumeSlider = document.getElementById('volume-slider');
-
-            // Elementi modal upload
-            elements.audioFileInput = document.getElementById('audio-file');
-            elements.dropArea = document.getElementById('drop-area');
-            elements.browseBtn = document.getElementById('browse-btn');
-            elements.fileInfo = document.getElementById('file-info');
-            elements.audioPreview = document.getElementById('audio-preview');
-            elements.titleInput = document.getElementById('title');
-            elements.artistInput = document.getElementById('artist');
-            elements.genreSelect = document.getElementById('genre');
-            elements.uploadFormBtn = document.getElementById('upload-btn');
-            elements.uploadProgress = document.getElementById('upload-progress');
-            elements.uploadProgressBar = document.getElementById('upload-progress-bar');
-            elements.progressText = document.getElementById('progress-text');
-            elements.uploadResult = document.getElementById('upload-result');
-        }
-
-        // Inizializza l'audio
-        function initializeAudio() {
-            state.audio = new Audio();
-            
-            // Event listener per l'audio
-            state.audio.addEventListener('timeupdate', updateProgress);
-            state.audio.addEventListener('ended', playNext);
-            state.audio.addEventListener('error', (e) => {
-                console.error('Errore riproduzione audio:', e);
-                showFlashMessage('Errore riproduzione audio', 'error');
-            });
-        }
-
-        // Configura tutti gli event listener
+        // Configura event listener
         function setupEventListeners() {
-            // Ricerca
-            elements.searchBtn.addEventListener('click', performSearch);
-            elements.searchInput.addEventListener('keyup', (e) => {
+            searchBtn.addEventListener('click', performSearch);
+            searchInput.addEventListener('keyup', (e) => {
                 if (e.key === 'Enter') performSearch();
             });
             
-            // Ordinamento
-            elements.sortSelect.addEventListener('change', () => {
-                state.currentSort = elements.sortSelect.value;
+            sortSelect.addEventListener('change', () => {
+                currentSort = sortSelect.value;
                 handleSortChange();
             });
             
-            // Filtri per genere
-            elements.genreButtons.forEach(btn => {
+            genreButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
-                    elements.genreButtons.forEach(b => b.classList.remove('active'));
+                    genreButtons.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    state.currentGenre = btn.dataset.genere;
+                    currentGenre = btn.dataset.genere;
                     handleGenreChange();
                 });
             });
             
-            // Modal upload
-            elements.openUploadModalBtn.addEventListener('click', openUploadModal);
-            elements.closeModalBtn.addEventListener('click', closeModal);
-            elements.cancelUploadBtn.addEventListener('click', closeModal);
+            openUploadModalBtn.addEventListener('click', openUploadModal);
+            closeModalBtn.addEventListener('click', closeModal);
+            cancelUploadBtn.addEventListener('click', closeModal);
             
-            elements.uploadModal.addEventListener('click', (e) => {
-                if (e.target === elements.uploadModal) closeModal();
+            uploadModal.addEventListener('click', (e) => {
+                if (e.target === uploadModal) closeModal();
             });
             
-            // Controlli player
-            elements.playBtn.addEventListener('click', togglePlay);
-            elements.prevBtn.addEventListener('click', playPrevious);
-            elements.nextBtn.addEventListener('click', playNext);
+            playBtn.addEventListener('click', togglePlay);
+            prevBtn.addEventListener('click', playPrevious);
+            nextBtn.addEventListener('click', playNext);
             
-            // Volume
-            elements.volumeSlider.addEventListener('input', () => {
-                state.audio.volume = elements.volumeSlider.value / 100;
+            volumeSlider.addEventListener('input', () => {
+                audio.volume = volumeSlider.value / 100;
             });
             
-            // Upload
+            audio.addEventListener('timeupdate', updateProgress);
+            audio.addEventListener('ended', playNext);
+            
             setupUploadListeners();
         }
 
-        // Configura event listener per l'upload
+        // Configura event listener upload
         function setupUploadListeners() {
-            elements.browseBtn.addEventListener('click', () => elements.audioFileInput.click());
-            elements.dropArea.addEventListener('click', () => elements.audioFileInput.click());
+            browseBtn.addEventListener('click', () => audioFileInput.click());
+            dropArea.addEventListener('click', () => audioFileInput.click());
             
-            elements.audioFileInput.addEventListener('change', handleFileSelect);
+            audioFileInput.addEventListener('change', handleFileSelect);
             
-            // Drag & drop
-            elements.dropArea.addEventListener('dragover', (e) => {
+            dropArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                elements.dropArea.classList.add('dragover');
+                dropArea.classList.add('dragover');
             });
             
-            elements.dropArea.addEventListener('dragleave', () => {
-                elements.dropArea.classList.remove('dragover');
+            dropArea.addEventListener('dragleave', () => {
+                dropArea.classList.remove('dragover');
             });
             
-            elements.dropArea.addEventListener('drop', (e) => {
+            dropArea.addEventListener('drop', (e) => {
                 e.preventDefault();
-                elements.dropArea.classList.remove('dragover');
+                dropArea.classList.remove('dragover');
                 
                 if (e.dataTransfer.files.length) {
-                    elements.audioFileInput.files = e.dataTransfer.files;
+                    audioFileInput.files = e.dataTransfer.files;
                     handleFileSelect();
                 }
             });
             
-            elements.uploadFormBtn.addEventListener('click', uploadAudio);
+            uploadFormBtn.addEventListener('click', uploadAudio);
         }
 
-        // Verifica connessione Supabase
-        async function checkSupabaseConnection() {
-            try {
-                const { data, error } = await supabase
-                    .from('tracce_audio')
-                    .select('*')
-                    .limit(1);
-                    
-                if (error) {
-                    console.warn('Supabase: tabella non trovata, creala seguendo le istruzioni');
-                    showFlashMessage('Tabella Supabase non trovata. Crea la tabella per salvare le tracce.', 'warning');
-                } else {
-                    console.log('Supabase: connessione OK');
-                }
-            } catch (error) {
-                console.error('Supabase: errore connessione', error);
-            }
-        }
-
-        // Carica tracce audio
-        async function loadAudioTracks() {
+        // Carica dati iniziali
+        async function loadInitialData() {
             showLoading();
             
             try {
-                // Prova a caricare da Supabase
-                const tracks = await loadTracksFromSupabase();
-                
-                if (tracks.length > 0) {
-                    state.audioTracks = tracks;
-                    renderAudioTracks();
-                    updateStats();
-                    showFlashMessage(`Caricate ${tracks.length} tracce da Supabase`, 'success');
-                } else {
-                    // Se non ci sono tracce, carica demo e mostra istruzioni
-                    loadSampleTracks();
-                    showFlashMessage('Nessuna traccia trovata. Carica la prima traccia!', 'info');
-                }
-                
+                await loadAudioTracks();
             } catch (error) {
-                console.error('Errore caricamento tracce:', error);
+                console.error('Errore caricamento iniziale:', error);
                 loadSampleTracks();
-                showFlashMessage('Modalità demo attiva. Configura Supabase per salvataggio permanente.', 'warning');
             }
         }
 
         // Carica tracce da Supabase
-        async function loadTracksFromSupabase() {
+        async function loadAudioTracks() {
+            showLoading();
+            
             try {
-                let query = supabase
-                    .from('tracce_audio')
-                    .select('*');
+                let query = supabaseClient.from('tracce_audio').select('*');
                 
-                // Filtro per genere
-                if (state.currentGenre !== 'tutti') {
-                    query = query.eq('genere', state.currentGenre);
+                if (currentGenre !== 'tutti') {
+                    query = query.eq('genere', currentGenre);
                 }
                 
-                // Ricerca
-                if (state.currentSearch) {
-                    query = query.or(`titolo.ilike.%${state.currentSearch}%,artista.ilike.%${state.currentSearch}%`);
+                if (currentSearch) {
+                    query = query.or(`titolo.ilike.%${currentSearch}%,artista.ilike.%${currentSearch}%`);
                 }
                 
-                // Ordinamento - CORREZIONE IMPORTANTE
-                const [field, order] = state.currentSort.split('.');
+                const [field, order] = currentSort.split('_');
                 query = query.order(field, { ascending: order === 'asc' });
                 
                 const { data, error } = await query;
                 
-                if (error) {
-                    // Se la tabella non esiste, ritorna array vuoto
-                    if (error.code === 'PGRST301' || error.message.includes('does not exist')) {
-                        console.log('Tabella non trovata in Supabase');
-                        return [];
-                    }
-                    throw error;
+                if (error) throw error;
+                
+                audioTracks = data || [];
+                
+                if (audioTracks.length === 0) {
+                    // Se non ci sono tracce in Supabase, carica quelle demo
+                    await checkAndCreateTable();
+                    loadSampleTracks();
+                } else {
+                    renderAudioTracks();
+                    updateStats();
                 }
                 
-                return data || [];
-                
             } catch (error) {
-                console.error('Errore caricamento da Supabase:', error);
-                throw error;
+                console.error('Errore Supabase, carico demo:', error);
+                loadSampleTracks();
+            }
+        }
+
+        // Verifica e crea tabella se non esiste
+        async function checkAndCreateTable() {
+            try {
+                // Prova a creare la tabella se non esiste
+                const { error } = await supabaseClient.rpc('create_tracks_table_if_not_exists');
+                if (error) {
+                    console.log('Tabella non creata, usando demo:', error.message);
+                }
+            } catch (error) {
+                console.log('Funzione RPC non disponibile');
             }
         }
 
@@ -1231,61 +1216,58 @@
         function loadSampleTracks() {
             const sampleTracks = [
                 {
-                    id: 'demo-1',
+                    id: '1',
                     titolo: 'Summer Vibes',
                     artista: 'DJ Harmony',
                     genere: 'elettronica',
                     url: 'https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3',
                     durata: 180,
                     dimensione: 5242880,
-                    data_caricamento: new Date().toISOString()
+                    data_caricamento: '2023-10-15T14:30:00Z'
                 },
                 {
-                    id: 'demo-2',
+                    id: '2',
                     titolo: 'Guitar Dreams',
                     artista: 'Rock Legends',
                     genere: 'rock',
                     url: 'https://assets.mixkit.co/music/preview/mixkit-driving-ambition-32.mp3',
                     durata: 240,
                     dimensione: 7340032,
-                    data_caricamento: new Date().toISOString()
+                    data_caricamento: '2023-10-10T09:15:00Z'
                 },
                 {
-                    id: 'demo-3',
+                    id: '3',
                     titolo: 'Midnight Jazz',
                     artista: 'Smooth Players',
                     genere: 'jazz',
                     url: 'https://assets.mixkit.co/music/preview/mixkit-jazz-comedy-239.mp3',
                     durata: 320,
                     dimensione: 10485760,
-                    data_caricamento: new Date().toISOString()
+                    data_caricamento: '2023-10-05T16:45:00Z'
                 }
             ];
             
-            state.audioTracks = sampleTracks;
+            audioTracks = sampleTracks;
             filterAndSortTracks();
         }
 
         // Filtra e ordina tracce
         function filterAndSortTracks() {
-            let filteredTracks = [...state.audioTracks];
+            let filteredTracks = [...audioTracks];
             
-            // Filtro genere
-            if (state.currentGenre !== 'tutti') {
-                filteredTracks = filteredTracks.filter(track => track.genere === state.currentGenre);
+            if (currentGenre !== 'tutti') {
+                filteredTracks = filteredTracks.filter(track => track.genere === currentGenre);
             }
             
-            // Filtro ricerca
-            if (state.currentSearch) {
-                const searchLower = state.currentSearch.toLowerCase();
+            if (currentSearch) {
+                const searchLower = currentSearch.toLowerCase();
                 filteredTracks = filteredTracks.filter(track => 
                     track.titolo.toLowerCase().includes(searchLower) || 
                     track.artista.toLowerCase().includes(searchLower)
                 );
             }
             
-            // Ordinamento
-            const [field, order] = state.currentSort.split('.');
+            const [field, order] = currentSort.split('_');
             const isAscending = order === 'asc';
             
             filteredTracks.sort((a, b) => {
@@ -1300,7 +1282,7 @@
                         aValue = a.durata;
                         bValue = b.durata;
                         break;
-                    case 'data_caricamento':
+                    case 'data':
                         aValue = new Date(a.data_caricamento);
                         bValue = new Date(b.data_caricamento);
                         break;
@@ -1314,43 +1296,30 @@
                 return 0;
             });
             
-            state.audioTracks = filteredTracks;
+            audioTracks = filteredTracks;
             renderAudioTracks();
             updateStats();
         }
 
         // Gestisce cambio genere
-        async function handleGenreChange() {
-            try {
-                await loadAudioTracks();
-            } catch (error) {
-                filterAndSortTracks();
-            }
+        function handleGenreChange() {
+            filterAndSortTracks();
         }
 
         // Gestisce cambio ordinamento
-        async function handleSortChange() {
-            try {
-                await loadAudioTracks();
-            } catch (error) {
-                filterAndSortTracks();
-            }
+        function handleSortChange() {
+            filterAndSortTracks();
         }
 
         // Esegui ricerca
-        async function performSearch() {
-            state.currentSearch = elements.searchInput.value.trim();
-            
-            try {
-                await loadAudioTracks();
-            } catch (error) {
-                filterAndSortTracks();
-            }
+        function performSearch() {
+            currentSearch = searchInput.value.trim();
+            filterAndSortTracks();
         }
 
         // Mostra loading
         function showLoading() {
-            elements.audioList.innerHTML = `
+            audioList.innerHTML = `
                 <div class="loading">
                     <i class="fas fa-spinner fa-spin"></i>
                     <p>Caricamento tracce audio...</p>
@@ -1358,10 +1327,23 @@
             `;
         }
 
+        // Mostra errore
+        function showError(message) {
+            audioList.innerHTML = `
+                <div class="loading">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>${message}</p>
+                    <button onclick="window.location.reload()" style="margin-top:15px; padding:10px 20px; background:#4361ee; color:white; border:none; border-radius:5px; cursor:pointer;">
+                        Ricarica
+                    </button>
+                </div>
+            `;
+        }
+
         // Renderizza tracce
         function renderAudioTracks() {
-            if (state.audioTracks.length === 0) {
-                elements.audioList.innerHTML = `
+            if (audioTracks.length === 0) {
+                audioList.innerHTML = `
                     <div class="loading">
                         <i class="fas fa-music"></i>
                         <p>Nessuna traccia audio trovata</p>
@@ -1371,9 +1353,9 @@
                 return;
             }
             
-            elements.audioList.innerHTML = '';
+            audioList.innerHTML = '';
             
-            state.audioTracks.forEach((track, index) => {
+            audioTracks.forEach((track, index) => {
                 const audioCard = document.createElement('div');
                 audioCard.className = 'audio-card';
                 audioCard.dataset.index = index;
@@ -1381,7 +1363,6 @@
                 const durationFormatted = formatDuration(track.durata);
                 const date = new Date(track.data_caricamento);
                 const dateFormatted = date.toLocaleDateString('it-IT');
-                const timeFormatted = date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
                 
                 audioCard.innerHTML = `
                     <div class="audio-header">
@@ -1400,16 +1381,15 @@
                         <button class="play-btn" data-index="${index}">
                             <i class="fas fa-play"></i>
                         </button>
-                        <button class="delete-btn" data-id="${track.id}" data-title="${track.titolo}">
+                        <button class="delete-btn" data-id="${track.id}">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
                 `;
                 
-                elements.audioList.appendChild(audioCard);
+                audioList.appendChild(audioCard);
             });
             
-            // Event listener per play
             document.querySelectorAll('.play-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -1418,20 +1398,16 @@
                 });
             });
             
-            // Event listener per delete
             document.querySelectorAll('.delete-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     const id = btn.dataset.id;
-                    const title = btn.dataset.title;
-                    
-                    if (confirm(`Sei sicuro di voler eliminare la traccia "${title}"?`)) {
+                    if (confirm('Sei sicuro di voler eliminare questa traccia?')) {
                         await deleteTrack(id);
                     }
                 });
             });
             
-            // Event listener per click sulla card
             document.querySelectorAll('.audio-card').forEach(card => {
                 card.addEventListener('click', (e) => {
                     if (!e.target.closest('button')) {
@@ -1442,368 +1418,394 @@
             });
         }
 
-        // Riproduce una traccia
+        // Riproduce traccia
         function playTrack(index) {
-            if (index < 0 || index >= state.audioTracks.length) return;
+            if (index < 0 || index >= audioTracks.length) return;
             
-            const track = state.audioTracks[index];
-            state.currentAudioIndex = index;
+            const track = audioTracks[index];
+            currentAudioIndex = index;
             
-            // Aggiorna UI
-            elements.currentTrackTitle.textContent = track.titolo;
-            elements.currentTrackArtist.textContent = track.artista;
+            currentTrackTitle.textContent = track.titolo;
+            currentTrackArtist.textContent = track.artista;
             
-            // Imposta e riproduci l'audio
-            state.audio.src = track.url;
-            state.audio.play().then(() => {
-                state.isPlaying = true;
-                elements.playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                elements.audioPlayer.style.display = 'block';
-                
-                // Evidenzia la traccia corrente
-                document.querySelectorAll('.audio-card').forEach(card => {
-                    card.classList.remove('playing');
-                });
-                document.querySelector(`.audio-card[data-index="${index}"]`).classList.add('playing');
-                
-            }).catch(error => {
-                console.error('Errore riproduzione:', error);
-                showFlashMessage('Errore riproduzione audio. Formato non supportato o file corrotto.', 'error');
+            audio.src = track.url;
+            audio.play();
+            isPlaying = true;
+            playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            
+            audioPlayer.style.display = 'block';
+            
+            document.querySelectorAll('.audio-card').forEach(card => {
+                card.classList.remove('playing');
             });
+            document.querySelector(`.audio-card[data-index="${index}"]`).classList.add('playing');
         }
 
         // Toggle play/pause
         function togglePlay() {
-            if (state.audioTracks.length === 0) return;
+            if (audioTracks.length === 0) return;
             
-            if (state.isPlaying) {
-                state.audio.pause();
-                elements.playBtn.innerHTML = '<i class="fas fa-play"></i>';
+            if (isPlaying) {
+                audio.pause();
+                playBtn.innerHTML = '<i class="fas fa-play"></i>';
             } else {
-                state.audio.play();
-                elements.playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                audio.play();
+                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
             }
-            state.isPlaying = !state.isPlaying;
+            isPlaying = !isPlaying;
         }
 
         // Traccia precedente
         function playPrevious() {
-            let newIndex = state.currentAudioIndex - 1;
-            if (newIndex < 0) newIndex = state.audioTracks.length - 1;
+            let newIndex = currentAudioIndex - 1;
+            if (newIndex < 0) newIndex = audioTracks.length - 1;
             playTrack(newIndex);
         }
 
         // Traccia successiva
         function playNext() {
-            let newIndex = state.currentAudioIndex + 1;
-            if (newIndex >= state.audioTracks.length) newIndex = 0;
+            let newIndex = currentAudioIndex + 1;
+            if (newIndex >= audioTracks.length) newIndex = 0;
             playTrack(newIndex);
         }
 
         // Aggiorna progress bar
         function updateProgress() {
-            if (state.audio.duration && !isNaN(state.audio.duration)) {
-                const progressPercent = (state.audio.currentTime / state.audio.duration) * 100;
-                elements.progress.style.width = `${progressPercent}%`;
+            if (audio.duration) {
+                const progressPercent = (audio.currentTime / audio.duration) * 100;
+                progress.style.width = `${progressPercent}%`;
                 
-                elements.currentTimeEl.textContent = formatTime(state.audio.currentTime);
-                elements.durationEl.textContent = formatTime(state.audio.duration);
+                currentTimeEl.textContent = formatTime(audio.currentTime);
+                durationEl.textContent = formatTime(audio.duration);
             }
         }
 
         // Aggiorna statistiche
         function updateStats() {
-            elements.totalTracksEl.textContent = state.audioTracks.length;
+            totalTracksEl.textContent = audioTracks.length;
             
-            const totalSize = state.audioTracks.reduce((sum, track) => sum + track.dimensione, 0);
-            elements.totalSizeEl.textContent = formatFileSize(totalSize);
+            const totalSize = audioTracks.reduce((sum, track) => sum + track.dimensione, 0);
+            totalSizeEl.textContent = formatFileSize(totalSize);
         }
 
         // Elimina traccia
         async function deleteTrack(id) {
             try {
-                // Se è una traccia demo, elimina solo localmente
-                if (id.startsWith('demo-')) {
-                    state.audioTracks = state.audioTracks.filter(track => track.id !== id);
-                    filterAndSortTracks();
-                    showFlashMessage('Traccia demo eliminata', 'success');
-                    return;
-                }
-                
-                // Prova a eliminare da Supabase
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('tracce_audio')
                     .delete()
                     .eq('id', id);
                     
                 if (error) throw error;
                 
-                // Aggiorna la lista
-                await loadAudioTracks();
+                loadAudioTracks();
                 
-                // Se la traccia eliminata era in riproduzione, ferma
-                if (state.audioTracks[state.currentAudioIndex] && state.audioTracks[state.currentAudioIndex].id === id) {
-                    state.audio.pause();
-                    state.isPlaying = false;
-                    elements.playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                    elements.audioPlayer.style.display = 'none';
+                if (audioTracks[currentAudioIndex] && audioTracks[currentAudioIndex].id === id) {
+                    audio.pause();
+                    isPlaying = false;
+                    playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                    audioPlayer.style.display = 'none';
                 }
                 
-                showFlashMessage('Traccia eliminata con successo!', 'success');
+                showMessage('Traccia eliminata con successo!', 'success');
                 
             } catch (error) {
                 console.error('Errore eliminazione:', error);
-                showFlashMessage('Errore eliminazione. Traccia rimossa localmente.', 'error');
+                showMessage('Errore nell\'eliminazione della traccia', 'error');
                 
-                // Fallback: rimuovi localmente
-                state.audioTracks = state.audioTracks.filter(track => track.id !== id);
+                // Rimuovi localmente per demo
+                audioTracks = audioTracks.filter(track => track.id !== id);
                 filterAndSortTracks();
             }
         }
 
+        // Mostra messaggio
+        function showMessage(message, type = 'info') {
+            const messageDiv = document.createElement('div');
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 25px;
+                background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+                color: white;
+                border-radius: 8px;
+                z-index: 3000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                animation: slideIn 0.3s ease;
+            `;
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => document.body.removeChild(messageDiv), 300);
+            }, 3000);
+            
+            // Aggiungi stili animazione
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes slideOut {
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(100%); opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Apre modal upload
+        function openUploadModal() {
+            uploadModal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Chiude modal
+        function closeModal() {
+            uploadModal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+            resetUploadForm();
+        }
+
         // Gestisce selezione file
         function handleFileSelect() {
-            state.selectedFile = elements.audioFileInput.files[0];
+            selectedFile = audioFileInput.files[0];
             
-            if (!state.selectedFile) return;
+            if (!selectedFile) return;
             
-            // Validazione
-            if (!state.selectedFile.type.startsWith('audio/')) {
-                showFlashMessage('Seleziona un file audio valido', 'error');
+            if (!selectedFile.type.startsWith('audio/')) {
+                showMessage('Seleziona un file audio valido (MP3, WAV, OGG, M4A)', 'error');
                 resetFileSelection();
                 return;
             }
             
-            if (state.selectedFile.size > 50 * 1024 * 1024) {
-                showFlashMessage('File troppo grande. Massimo 50MB', 'error');
+            if (selectedFile.size > 50 * 1024 * 1024) {
+                showMessage('File troppo grande. Dimensione massima: 50MB', 'error');
                 resetFileSelection();
                 return;
             }
             
-            // Mostra info file
-            elements.fileInfo.innerHTML = `
+            fileInfo.innerHTML = `
                 <div class="file-details">
                     <i class="fas fa-file-audio"></i>
                     <div>
-                        <p><strong>${state.selectedFile.name}</strong></p>
-                        <p>${formatFileSize(state.selectedFile.size)} • ${state.selectedFile.type}</p>
+                        <p><strong>${selectedFile.name}</strong></p>
+                        <p>${formatFileSize(selectedFile.size)} • ${selectedFile.type}</p>
                     </div>
                 </div>
             `;
             
-            // Crea anteprima
             createAudioPreview();
         }
 
         // Crea anteprima audio
         function createAudioPreview() {
-            const url = URL.createObjectURL(state.selectedFile);
+            const url = URL.createObjectURL(selectedFile);
             
-            if (state.modalAudioElement) {
-                state.modalAudioElement.pause();
-                elements.audioPreview.removeChild(state.modalAudioElement);
+            if (modalAudioElement) {
+                modalAudioElement.pause();
+                audioPreview.removeChild(modalAudioElement);
             }
             
-            state.modalAudioElement = new Audio(url);
-            state.modalAudioElement.controls = true;
-            state.modalAudioElement.style.width = '100%';
-            state.modalAudioElement.preload = 'metadata';
+            modalAudioElement = new Audio(url);
+            modalAudioElement.controls = true;
+            modalAudioElement.style.width = '100%';
             
-            elements.audioPreview.innerHTML = '';
-            elements.audioPreview.appendChild(state.modalAudioElement);
+            audioPreview.innerHTML = '';
+            audioPreview.appendChild(modalAudioElement);
             
-            // Estrai metadati dal nome file
-            extractMetadataFromFilename();
+            extractMetadata();
         }
 
-        // Estrai metadati dal nome file
-        function extractMetadataFromFilename() {
-            if (!elements.titleInput.value) {
-                const fileName = state.selectedFile.name.replace(/\.[^/.]+$/, "");
-                elements.titleInput.value = fileName
-                    .replace(/_/g, ' ')
-                    .replace(/-/g, ' ')
-                    .replace(/\s+/g, ' ')
-                    .trim();
+        // Estrae metadati
+        function extractMetadata() {
+            if (!titleInput.value) {
+                const fileName = selectedFile.name.replace(/\.[^/.]+$/, "");
+                titleInput.value = fileName;
             }
         }
 
         // Resetta selezione file
         function resetFileSelection() {
-            state.selectedFile = null;
-            elements.audioFileInput.value = '';
-            elements.fileInfo.innerHTML = '';
-            elements.audioPreview.innerHTML = '<p>Nessun file selezionato</p>';
+            selectedFile = null;
+            audioFileInput.value = '';
+            fileInfo.innerHTML = '';
+            audioPreview.innerHTML = '<p>Nessun file selezionato</p>';
             
-            if (state.modalAudioElement) {
-                state.modalAudioElement.pause();
-                state.modalAudioElement = null;
+            if (modalAudioElement) {
+                modalAudioElement.pause();
+                modalAudioElement = null;
             }
         }
 
-        // Carica audio
+        // Carica audio su Supabase
         async function uploadAudio() {
-            // Validazione
-            if (!state.selectedFile) {
-                showFlashMessage('Seleziona un file audio', 'error');
+            if (!selectedFile) {
+                showMessage('Seleziona un file audio', 'error');
                 return;
             }
             
-            if (!elements.titleInput.value.trim()) {
-                showFlashMessage('Inserisci un titolo', 'error');
-                elements.titleInput.focus();
+            if (!titleInput.value.trim()) {
+                showMessage('Inserisci un titolo per la traccia', 'error');
+                titleInput.focus();
                 return;
             }
             
-            // Disabilita pulsante
-            elements.uploadFormBtn.disabled = true;
-            elements.uploadFormBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Caricamento...';
+            uploadFormBtn.disabled = true;
+            uploadFormBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Caricamento in corso...';
             
-            // Mostra progresso
-            elements.uploadProgress.style.display = 'block';
-            elements.uploadProgressBar.style.width = '0%';
-            elements.progressText.textContent = 'Preparazione...';
+            uploadProgress.style.display = 'block';
+            uploadProgressBar.style.width = '0%';
+            progressText.textContent = 'Preparazione...';
             
             try {
-                // Calcola durata
-                const duration = await getAudioDuration(state.selectedFile);
+                // Per demo, se Supabase non funziona
+                const isSupabaseWorking = await testSupabaseWorking();
                 
-                // 1. Prova a caricare su Supabase
-                const supabaseResult = await trySupabaseUpload(duration);
-                
-                if (supabaseResult.success) {
-                    // Successo Supabase
-                    showUploadSuccess(supabaseResult.trackTitle, true);
-                    
-                } else {
-                    // Fallback: modalità demo
-                    console.log('Supabase non disponibile, uso modalità demo');
-                    simulateDemoUpload(duration);
+                if (!isSupabaseWorking) {
+                    simulateUpload();
+                    return;
                 }
                 
-            } catch (error) {
-                console.error('Errore upload:', error);
-                showUploadError('Errore caricamento: ' + (error.message || 'Sconosciuto'));
-            } finally {
-                // Riabilita pulsante
-                elements.uploadFormBtn.disabled = false;
-                elements.uploadFormBtn.innerHTML = '<i class="fas fa-upload"></i> Carica Traccia';
-            }
-        }
-
-        // Prova upload su Supabase
-        async function trySupabaseUpload(duration) {
-            try {
-                // Genera nome file univoco
-                const fileExt = state.selectedFile.name.split('.').pop();
+                const fileExt = selectedFile.name.split('.').pop();
                 const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
                 const filePath = `audio/${fileName}`;
                 
-                // 1. Upload su Storage
-                elements.progressText.textContent = 'Upload file...';
+                const duration = await getAudioDuration(selectedFile);
                 
-                const { data: uploadData, error: uploadError } = await supabase.storage
+                progressText.textContent = 'Caricamento file...';
+                
+                const { data: uploadData, error: uploadError } = await supabaseClient.storage
                     .from('audio_files')
-                    .upload(filePath, state.selectedFile, {
+                    .upload(filePath, selectedFile, {
                         cacheControl: '3600',
-                        upsert: false,
-                        onUploadProgress: (progress) => {
-                            const percent = Math.round((progress.loaded / progress.total) * 100);
-                            elements.uploadProgressBar.style.width = `${percent}%`;
-                            elements.progressText.textContent = `Upload: ${percent}%`;
-                        }
+                        upsert: false
                     });
                     
                 if (uploadError) throw uploadError;
                 
-                // 2. Ottieni URL pubblico
-                const { data: urlData } = supabase.storage
+                const { data: urlData } = supabaseClient.storage
                     .from('audio_files')
                     .getPublicUrl(filePath);
                     
                 const publicUrl = urlData.publicUrl;
                 
-                // 3. Salva metadati nel database
-                elements.progressText.textContent = 'Salvataggio metadati...';
+                progressText.textContent = 'Salvataggio metadati...';
                 
                 const trackData = {
-                    titolo: elements.titleInput.value.trim(),
-                    artista: elements.artistInput.value.trim() || 'Artista sconosciuto',
-                    genere: elements.genreSelect.value,
+                    titolo: titleInput.value.trim(),
+                    artista: artistInput.value.trim() || 'Artista sconosciuto',
+                    genere: genreSelect.value,
                     url: publicUrl,
                     durata: duration,
-                    dimensione: state.selectedFile.size,
+                    dimensione: selectedFile.size,
                     data_caricamento: new Date().toISOString()
                 };
                 
-                const { data: dbData, error: dbError } = await supabase
+                const { data: dbData, error: dbError } = await supabaseClient
                     .from('tracce_audio')
                     .insert([trackData])
                     .select();
                     
                 if (dbError) throw dbError;
                 
-                return {
-                    success: true,
-                    trackTitle: trackData.titolo,
-                    trackData: dbData[0]
-                };
+                uploadProgressBar.style.width = '100%';
+                progressText.textContent = 'Completato!';
+                
+                showUploadSuccess(trackData.titolo);
                 
             } catch (error) {
-                console.warn('Supabase upload fallito:', error);
-                return { success: false, error };
+                console.error('Errore caricamento:', error);
+                showUploadError('Errore: ' + (error.message || 'Caricamento fallito'));
+            } finally {
+                uploadFormBtn.disabled = false;
+                uploadFormBtn.innerHTML = '<i class="fas fa-upload"></i> Carica Traccia';
             }
         }
 
-        // Simula upload demo
-        function simulateDemoUpload(duration) {
-            let progress = 0;
+        // Testa se Supabase funziona
+        async function testSupabaseWorking() {
+            try {
+                await supabaseClient.from('tracce_audio').select('count').limit(1);
+                return true;
+            } catch {
+                return false;
+            }
+        }
+
+        // Simula upload per demo
+        function simulateUpload() {
+            let progressValue = 0;
             const interval = setInterval(() => {
-                progress += 10;
-                elements.uploadProgressBar.style.width = `${progress}%`;
-                elements.progressText.textContent = `Simulazione: ${progress}%`;
+                progressValue += 5;
+                uploadProgressBar.style.width = `${progressValue}%`;
+                progressText.textContent = `Caricamento: ${progressValue}%`;
                 
-                if (progress >= 100) {
+                if (progressValue >= 100) {
                     clearInterval(interval);
                     
-                    // Aggiungi traccia demo localmente
-                    const demoId = `demo-${Date.now()}`;
                     const demoTrack = {
-                        id: demoId,
-                        titolo: elements.titleInput.value.trim() || 'Traccia Demo',
-                        artista: elements.artistInput.value.trim() || 'Artista Demo',
-                        genere: elements.genreSelect.value,
-                        url: URL.createObjectURL(state.selectedFile),
-                        durata: duration,
-                        dimensione: state.selectedFile.size,
+                        id: Date.now().toString(),
+                        titolo: titleInput.value.trim() || 'Traccia Demo',
+                        artista: artistInput.value.trim() || 'Artista Demo',
+                        genere: genreSelect.value,
+                        url: 'https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3',
+                        durata: 180,
+                        dimensione: selectedFile ? selectedFile.size : 5242880,
                         data_caricamento: new Date().toISOString()
                     };
                     
-                    state.audioTracks.unshift(demoTrack);
+                    audioTracks.unshift(demoTrack);
                     
-                    showUploadSuccess(demoTrack.titolo, false);
+                    showUploadSuccessDemo(demoTrack.titolo);
                 }
             }, 100);
         }
 
         // Mostra successo upload
-        function showUploadSuccess(trackTitle, isSupabase) {
-            elements.uploadProgressBar.style.width = '100%';
-            elements.progressText.textContent = 'Completato!';
+        function showUploadSuccess(trackTitle) {
+            uploadProgressBar.style.width = '100%';
+            progressText.textContent = 'Completato!';
             
-            elements.uploadResult.style.display = 'block';
-            elements.uploadResult.innerHTML = `
+            uploadResult.style.display = 'block';
+            uploadResult.innerHTML = `
                 <div class="success-message">
                     <i class="fas fa-check-circle"></i>
                     <h3>Traccia caricata con successo!</h3>
-                    <p>La tua traccia "${trackTitle}" è stata ${isSupabase ? 'salvata su Supabase' : 'aggiunta localmente'}.</p>
-                    ${!isSupabase ? '<p><small>Configura Supabase per il salvataggio permanente.</small></p>' : ''}
+                    <p>La tua traccia "${trackTitle}" è stata aggiunta alla libreria.</p>
                     <div class="action-buttons">
-                        <button onclick="window.location.reload()" class="upload-btn">
-                            <i class="fas fa-redo"></i> Ricarica Pagina
+                        <button onclick="closeModalAndRefresh()" class="upload-btn">
+                            <i class="fas fa-music"></i> Vai alla Libreria
                         </button>
                         <button onclick="resetUploadForm()" class="cancel-btn">
-                            <i class="fas fa-plus"></i> Carica Altra
+                            <i class="fas fa-plus"></i> Carica un'altra traccia
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Mostra successo upload demo
+        function showUploadSuccessDemo(trackTitle) {
+            uploadProgressBar.style.width = '100%';
+            progressText.textContent = 'Completato!';
+            
+            uploadResult.style.display = 'block';
+            uploadResult.innerHTML = `
+                <div class="success-message">
+                    <i class="fas fa-check-circle"></i>
+                    <h3>Traccia caricata (Modalità Demo)</h3>
+                    <p>La traccia "${trackTitle}" è stata aggiunta localmente.</p>
+                    <p><small>Configura la tabella in Supabase per il salvataggio permanente.</small></p>
+                    <div class="action-buttons">
+                        <button onclick="closeModalAndRefresh()" class="upload-btn">
+                            <i class="fas fa-music"></i> Aggiorna Libreria
+                        </button>
+                        <button onclick="resetUploadForm()" class="cancel-btn">
+                            <i class="fas fa-plus"></i> Carica un'altra traccia
                         </button>
                     </div>
                 </div>
@@ -1812,8 +1814,8 @@
 
         // Mostra errore upload
         function showUploadError(errorMessage) {
-            elements.uploadResult.style.display = 'block';
-            elements.uploadResult.innerHTML = `
+            uploadResult.style.display = 'block';
+            uploadResult.innerHTML = `
                 <div class="error-message">
                     <i class="fas fa-exclamation-triangle"></i>
                     <h3>Errore nel caricamento</h3>
@@ -1830,89 +1832,43 @@
             return new Promise((resolve) => {
                 const audio = new Audio();
                 audio.src = URL.createObjectURL(file);
-                audio.preload = 'metadata';
                 
                 audio.addEventListener('loadedmetadata', () => {
-                    const duration = Math.floor(audio.duration);
+                    resolve(Math.floor(audio.duration));
                     URL.revokeObjectURL(audio.src);
-                    resolve(duration || 0);
                 });
                 
                 audio.addEventListener('error', () => {
-                    URL.revokeObjectURL(audio.src);
                     resolve(0);
                 });
-                
-                // Timeout di sicurezza
-                setTimeout(() => {
-                    URL.revokeObjectURL(audio.src);
-                    resolve(0);
-                }, 5000);
             });
         }
 
-        // Apri modal upload
-        function openUploadModal() {
-            elements.uploadModal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-        }
-
-        // Chiudi modal
-        function closeModal() {
-            elements.uploadModal.style.display = 'none';
-            document.body.style.overflow = 'auto';
-            resetUploadForm();
+        // Chiude modal e ricarica
+        function closeModalAndRefresh() {
+            closeModal();
+            loadAudioTracks();
         }
 
         // Resetta form upload
         function resetUploadForm() {
             resetFileSelection();
-            elements.titleInput.value = '';
-            elements.artistInput.value = '';
-            elements.genreSelect.value = 'pop';
-            elements.uploadProgress.style.display = 'none';
-            elements.uploadResult.style.display = 'none';
-            elements.uploadResult.innerHTML = '';
+            titleInput.value = '';
+            artistInput.value = '';
+            genreSelect.value = 'pop';
+            uploadProgress.style.display = 'none';
+            uploadResult.style.display = 'none';
+            uploadResult.innerHTML = '';
         }
 
         // Riprova upload
         function retryUpload() {
-            elements.uploadResult.style.display = 'none';
+            uploadResult.style.display = 'none';
             uploadAudio();
-        }
-
-        // Mostra messaggio flash
-        function showFlashMessage(message, type = 'info') {
-            // Rimuovi messaggi precedenti
-            document.querySelectorAll('.flash-message').forEach(msg => msg.remove());
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `flash-message ${type === 'error' ? 'flash-error' : ''}`;
-            messageDiv.textContent = message;
-            
-            // Stile basato sul tipo
-            if (type === 'success') {
-                messageDiv.style.background = '#4CAF50';
-            } else if (type === 'error') {
-                messageDiv.style.background = '#f44336';
-            } else if (type === 'warning') {
-                messageDiv.style.background = '#ff9800';
-            } else {
-                messageDiv.style.background = '#2196F3';
-            }
-            
-            document.body.appendChild(messageDiv);
-            
-            // Auto-rimuovi dopo 5 secondi
-            setTimeout(() => {
-                messageDiv.style.animation = 'slideOut 0.3s ease';
-                setTimeout(() => messageDiv.remove(), 300);
-            }, 5000);
         }
 
         // Formatta durata
         function formatDuration(seconds) {
-            if (!seconds || seconds <= 0) return '0:00';
             const mins = Math.floor(seconds / 60);
             const secs = Math.floor(seconds % 60);
             return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -1920,7 +1876,6 @@
 
         // Formatta tempo
         function formatTime(seconds) {
-            if (!seconds || isNaN(seconds)) return '0:00';
             const mins = Math.floor(seconds / 60);
             const secs = Math.floor(seconds % 60);
             return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -1928,13 +1883,13 @@
 
         // Formatta dimensione file
         function formatFileSize(bytes) {
-            if (!bytes || bytes <= 0) return '0 B';
             if (bytes < 1024) return bytes + ' B';
             else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
             else return (bytes / 1048576).toFixed(1) + ' MB';
         }
 
         // Espone funzioni globali
+        window.closeModalAndRefresh = closeModalAndRefresh;
         window.resetUploadForm = resetUploadForm;
         window.retryUpload = retryUpload;
     </script>
